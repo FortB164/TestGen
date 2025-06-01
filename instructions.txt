@@ -1,0 +1,199 @@
+def test_add_edge_1():
+    assert add(2, -2) == 0
+
+def test_add_edge_2():
+    assert add(-2, 2) == 0
+
+def test_add_null_1():
+    with pytest.raises(TypeError):
+        add(None, 5)
+
+def test_add_null_2():
+    with pytest.raises(TypeError):
+        add(5, None)
+
+def test_add_unusual_1():
+    assert add(-sys.maxsize, 1) == -sys.maxsize + 1
+
+def test_add_unusual_2():
+    assert add(sys.maxsize, -1) == sys.maxsize - 1
+
+def test_is_even_edge_1():
+    assert is_even(0) is True
+
+def test_is_even_edge_2():
+    assert is_even(1) is False
+
+def test_is_even_null_1():
+    with pytest.raises(TypeError):
+        is_even(None)
+
+def test_is_even_null_2():
+    with pytest.raises(TypeError):
+        is_even("string")
+
+def test_is_even_unusual_1():
+    assert is_even(sys.maxsize) is True
+
+def test_is_even_unusual_2():
+    assert is_even(-sys.maxsize) is True
+
+def test_reverse_string_edge_1():
+    assert reverse_string("hello") == "olleh"
+
+def test_reverse_string_edge_2():
+    assert reverse_string("") == ""
+
+def test_reverse_string_null_1():
+    with pytest.raises(TypeError):
+        reverse_string(None)
+
+def test_reverse_string_null_2():
+    with pytest.raises(TypeError):
+        reverse_string(123)
+
+def test_reverse_string_unusual_1():
+    assert reverse_string("a" * sys.maxsize) == "a" * sys.maxsize
+
+def test_reverse_string_unusual_2():
+    assert reverse_string("abcdefghijklmnopqrstuvwxyz") == "zyxwvutsrqponmlkjihgfedcba"
+
+def test_max_of_three_edge_1():
+    assert max_of_three(1, 2, 3) == 3
+
+def test_max_of_three_edge_2():
+    assert max_of_three(-1, -2, -3) == -1
+
+def test_max_of_three_null_1():
+    with pytest.raises(TypeError):
+        max_of_three(None, 2, 3)
+
+def test_max_of_three_null_2():
+    with pytest.raises(TypeError):
+        max_of_three(1, None, 3)
+
+def test_max_of_three_unusual_1():
+    assert max_of_three(sys.maxsize, sys.maxsize - 1, sys.maxsize - 2) == sys.maxsize
+
+def test_max_of_three_unusual_2():
+    assert max_of_three(-sys.maxsize, -sys.maxsize + 1, -sys.maxsize + 2) == -sys.maxsize + 2
+
+def test_factorial_edge_1():
+    assert factorial(0) == 1
+
+def test_factorial_edge_2():
+    assert factorial(1) == 1
+
+def test_factorial_null_1():
+    with pytest.raises(TypeError):
+        factorial(None)
+
+def test_factorial_null_2():
+    with pytest.raises(TypeError):
+        factorial("string")
+
+def test_factorial_unusual_1():
+    assert factorial(sys.maxsize) == math.inf
+
+def test_factorial_unusual_2():
+    assert factorial(-1) == math.inf
+
+def test_is_palindrome_edge_1():
+    assert is_palindrome("madam") is True
+
+def test_is_palindrome_edge_2():
+    assert is_palindrome("hello") is False
+
+def test_is_palindrome_null_1():
+    with pytest.raises(TypeError):
+        is_palindrome(None)
+
+def test_is_palindrome_null_2():
+    with pytest.raises(TypeError):
+        is_palindrome(123)
+
+def test_is_palindrome_unusual_1():
+    assert is_palindrome("a" * sys.maxsize) is True
+
+def test_is_palindrome_unusual_2():
+    assert is_palindrome("abcdefghijklmnopqrstuvwxyz") is False
+
+def test_fibonacci_edge_1():
+    assert fibonacci(0) == 0
+
+def test_fibonacci_edge_2():
+    assert fibonacci(1) == 1
+
+def test_fibonacci_null_1():
+    with pytest.raises(TypeError):
+        fibonacci(None)
+
+def test_fibonacci_null_2():
+    with pytest.raises(TypeError):
+        fibonacci("string")
+
+def test_fibonacci_unusual_1():
+    assert fibonacci(sys.maxsize) == math.inf
+
+def test_fibonacci_unusual_2():
+    assert fibonacci(-1) == math.inf
+
+def test_count_vowels_edge_1():
+    assert count_vowels("hello") == 2
+
+def test_count_vowels_edge_2():
+    assert count_vowels("") == 0
+
+def test_count_vowels_null_1():
+    with pytest.raises(TypeError):
+        count_vowels(None)
+
+def test_count_vowels_null_2():
+    with pytest.raises(TypeError):
+        count_vowels(123)
+
+def test_count_vowels_unusual_1():
+    assert count_vowels("a" * sys.maxsize) == sys.maxsize
+
+def test_count_vowels_unusual_2():
+    assert count_vowels("abcdefghijklmnopqrstuvwxyz") == 5
+
+def test_square_edge_1():
+    assert square(0) == 0
+
+def test_square_edge_2():
+    assert square(1) == 1
+
+def test_square_null_1():
+    with pytest.raises(TypeError):
+        square(None)
+
+def test_square_null_2():
+    with pytest.raises(TypeError):
+        square("string")
+
+def test_square_unusual_1():
+    assert square(sys.maxsize) == sys.maxsize ** 2
+
+def test_square_unusual_2():
+    assert square(-sys.maxsize) == sys.maxsize ** 2
+
+def test_is_prime_edge_1():
+    assert is_prime(2) is True
+
+def test_is_prime_edge_2():
+    assert is_prime(1) is False
+
+def test_is_prime_null_1():
+    with pytest.raises(TypeError):
+        is_prime(None)
+
+def test_is_prime_null_2():
+    with pytest.raises(TypeError):
+        is_prime("string")
+
+def test_is_prime_unusual_1():
+    assert is_prime(sys.maxsize) is False
+
+def test_is_prime_unusual_2():
+    assert is_prime(-sys.maxsize) is False
