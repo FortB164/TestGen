@@ -196,4 +196,4 @@ def test_is_prime_unusual_1():
     assert is_prime(sys.maxsize) is False
 
 def test_is_prime_unusual_2():
-    assert is_prime(-sys.maxsize) is False
+    assert is_prime(-sys.maxsize) is False 
