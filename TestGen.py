@@ -1,14 +1,123 @@
 import re
 import os
 import ollama
-from typing import List
+import json
+from typing import List, Dict, Tuple
+from pathlib import Path
+import argparse
+
+class ModelTrainer:
+    def __init__(self, model_name: str = "starcoder:7b"):
+        """Initialize the model trainer with a specific Ollama model."""
+        self.model_name = model_name
+        self.training_data_path = 'training_data'
+        
+    def prepare_training_data(self, source_dir: str, test_dir: str) -> List[Dict]:
+        """
+        Prepare training data from source and test files.
+        Returns a list of training examples in the format required by Ollama.
+        """
+        training_examples = []
+        
+        # Get all Python files from both directories
+        source_files = list(Path(source_dir).glob('**/*.py'))
+        test_files = list(Path(test_dir).glob('**/*.py'))
+        
+        # Create a mapping of source files to their test files
+        file_pairs = self._match_source_test_files(source_files, test_files)
+        
+        for source_file, test_file in file_pairs:
+            try:
+                # Read source and test content
+                source_content = self._read_file(source_file)
+                test_content = self._read_file(test_file)
+                
+                # Create training example
+                example = {
+                    "instruction": "Generate test cases for the following Python function:",
+                    "input": source_content,
+                    "output": test_content
+                }
+                training_examples.append(example)
+                
+            except Exception as e:
+                print(f"Error processing {source_file}: {e}")
+        
+        return training_examples
+    
+    def _match_source_test_files(self, source_files: List[Path], test_files: List[Path]) -> List[Tuple[Path, Path]]:
+        """Match source files with their corresponding test files."""
+        file_pairs = []
+        
+        for source_file in source_files:
+            # Try to find matching test file
+            test_file = None
+            source_name = source_file.stem
+            
+            # Look for test file with _test suffix
+            test_file = next((f for f in test_files if f.stem == f"{source_name}_test"), None)
+            
+            if test_file:
+                file_pairs.append((source_file, test_file))
+            else:
+                print(f"No matching test file found for {source_file}")
+        
+        return file_pairs
+    
+    def _read_file(self, file_path: Path) -> str:
+        """Read file content with proper encoding handling."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except UnicodeDecodeError:
+            # Try with a different encoding if UTF-8 fails
+            with open(file_path, 'r', encoding='latin-1') as f:
+                return f.read()
+    
+    def save_training_data(self, examples: List[Dict], output_file: str):
+        """Save training examples to a JSON file."""
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(examples, f, indent=2)
+    
+    def fine_tune_model(self, training_data_file: str, output_model_name: str):
+        """
+        Fine-tune the model using the prepared training data.
+        This uses Ollama's fine-tuning capabilities.
+        """
+        try:
+            # Read training data
+            with open(training_data_file, 'r', encoding='utf-8') as f:
+                training_data = json.load(f)
+            
+            # Prepare the fine-tuning configuration
+            config = {
+                "model": self.model_name,
+                "output_model": output_model_name,
+                "training_data": training_data
+            }
+            
+            # Call Ollama's fine-tuning API
+            response = ollama.create(
+                model=output_model_name,
+                path=training_data_file,
+                config=config
+            )
+            
+            print(f"Fine-tuning completed. New model name: {output_model_name}")
+            return response
+            
+        except Exception as e:
+            print(f"Error during fine-tuning: {e}")
+            raise
 
 class TestGenerator:
-    def __init__(self, model_name: str = "mistral"):
+    def __init__(self, model_name: str = "starcoder:7b"):
         """Initialize the test generator with a specific Ollama model."""
         self.model_name = model_name
         self.instructions_path = 'instructions.txt'  # Hardcoded instructions path
         self.files_list_path = 'programming_files_list.txt'  # Hardcoded files list path
+        self.trainer = ModelTrainer(model_name)  # Add trainer instance
 
     def read_python_file(self, file_path: str) -> str:
         """
@@ -123,6 +232,14 @@ def test_{example_func}_unusual_2():
             # Prepare the message with clear formatting instructions and better examples
             message = f"""WRITE ONLY PYTHON TEST FUNCTIONS IN THIS EXACT FORMAT:
 
+def test_functionname_basic_1():
+    # Test basic functionality with typical inputs
+    assert functionname(typical_input_1) == expected_result_1
+
+def test_functionname_basic_2():
+    # Test basic functionality with different typical inputs
+    assert functionname(typical_input_2) == expected_result_2
+
 def test_functionname_edge_1():
     # Test boundary values, minimum values
     assert functionname(min_value) == expected_result
@@ -170,13 +287,15 @@ IF YOU WRITE ANYTHING ELSE, YOU WILL BE PENALIZED.
 IF YOU PROVIDE SUGGESTIONS OR EXPLANATIONS, YOU WILL BE PENALIZED.
 IF YOU USE MARKDOWN CODE BLOCKS, YOU WILL BE PENALIZED.
 
-YOU MUST FOLLOW THIS EXACT NAMING PATTERN FOR EACH FUNCTION:
-1. test_functionname_edge_1() - Test edge case 1 (e.g., boundary values, minimum values)
-2. test_functionname_edge_2() - Test edge case 2 (e.g., boundary values, maximum values)
-3. test_functionname_null_1() - Test null case 1 (e.g., None, empty strings)
-4. test_functionname_null_2() - Test null case 2 (e.g., invalid types)
-5. test_functionname_unusual_1() - Test unusual case 1 (e.g., very large values)
-6. test_functionname_unusual_2() - Test unusual case 2 (e.g., very small values)
+ANALYZE THE FUNCTION'S PURPOSE AND PARAMETERS TO GENERATE APPROPRIATE TESTS.
+FOR EACH FUNCTION, GENERATE TESTS THAT COVER:
+
+1. test_functionname_basic_1(): Basic functionality with typical inputs
+2. test_functionname_basic_2(): Basic functionality with different typical inputs
+3. test_functionname_edge_1(): Edge cases (boundary values, empty inputs, etc.)
+4. test_functionname_edge_2(): More edge cases specific to the function
+5. test_functionname_error_1(): Error cases (invalid inputs, type errors, etc.)
+6. test_functionname_error_2(): More error cases specific to the function
 
 WRITE EXACTLY 6 TEST FUNCTIONS FOR EACH SOURCE FUNCTION.
 EACH TEST FUNCTION MUST CONTAIN DIFFERENT TEST CASES.
@@ -184,28 +303,65 @@ EACH TEST FUNCTION MUST CONTAIN ACTUAL ASSERT STATEMENTS.
 START IMMEDIATELY WITH THE FIRST TEST FUNCTION.
 DO NOT WRITE ANYTHING ELSE.
 
-EXAMPLE RESPONSE:
-def test_add_edge_1():
-    assert add(0, 0) == 0
-    assert add(1, 0) == 1
+EXAMPLE RESPONSES:
 
-def test_add_edge_2():
-    assert add(-1, 1) == 0
-    assert add(sys.maxsize, 0) == sys.maxsize
+For a string manipulation function:
+def test_reverse_string_basic_1():
+    assert reverse_string("hello") == "olleh"
+    assert reverse_string("world") == "dlrow"
 
-def test_add_null_1():
+def test_reverse_string_basic_2():
+    assert reverse_string("python") == "nohtyp"
+    assert reverse_string("test") == "tset"
+
+def test_reverse_string_edge_1():
+    assert reverse_string("") == ""
+    assert reverse_string("a") == "a"
+
+def test_reverse_string_edge_2():
+    assert reverse_string("  ") == "  "
+    assert reverse_string("123") == "321"
+
+def test_reverse_string_error_1():
     with pytest.raises(TypeError):
-        add(None, 5)
-
-def test_add_null_2():
+        reverse_string(None)
     with pytest.raises(TypeError):
-        add("string", 5)
+        reverse_string(123)
 
-def test_add_unusual_1():
-    assert add(-sys.maxsize, 1) == -sys.maxsize + 1
+def test_reverse_string_error_2():
+    with pytest.raises(TypeError):
+        reverse_string([])
+    with pytest.raises(TypeError):
+        reverse_string({})
 
-def test_add_unusual_2():
-    assert add(0.1, 0.2) == pytest.approx(0.3)
+For a mathematical function:
+def test_calculate_area_basic_1():
+    assert calculate_area(5, 3) == 15
+    assert calculate_area(4, 4) == 16
+
+def test_calculate_area_basic_2():
+    assert calculate_area(2.5, 2) == 5
+    assert calculate_area(3, 3.5) == 10.5
+
+def test_calculate_area_edge_1():
+    assert calculate_area(0, 5) == 0
+    assert calculate_area(5, 0) == 0
+
+def test_calculate_area_edge_2():
+    assert calculate_area(0.1, 0.1) == pytest.approx(0.01)
+    assert calculate_area(1e-10, 1e-10) == pytest.approx(1e-20)
+
+def test_calculate_area_error_1():
+    with pytest.raises(ValueError):
+        calculate_area(-1, 5)
+    with pytest.raises(ValueError):
+        calculate_area(5, -1)
+
+def test_calculate_area_error_2():
+    with pytest.raises(TypeError):
+        calculate_area("5", 3)
+    with pytest.raises(TypeError):
+        calculate_area(5, "3")
 
 REMEMBER: ONLY WRITE TEST FUNCTIONS WITH ACTUAL ASSERTIONS. NO PLACEHOLDERS OR TODOS."""},
                 {"role": "user", "content": message}
@@ -325,7 +481,7 @@ REMEMBER: ONLY WRITE TEST FUNCTIONS WITH ACTUAL ASSERTIONS. NO PLACEHOLDERS OR T
         final_tests = []
         for source_name, funcs in source_functions.items():
             # Ensure we have exactly 6 test functions per source function
-            test_types = ['edge_1', 'edge_2', 'null_1', 'null_2', 'unusual_1', 'unusual_2']
+            test_types = ['basic_1', 'basic_2', 'edge_1', 'edge_2', 'error_1', 'error_2']
             processed_funcs = {}
             
             # Group functions by test type
@@ -353,11 +509,16 @@ REMEMBER: ONLY WRITE TEST FUNCTIONS WITH ACTUAL ASSERTIONS. NO PLACEHOLDERS OR T
     # Example null case test
     with pytest.raises(TypeError):
         {source_name}(None)  # Replace with appropriate values"""
-                    else:  # unusual
+                    elif test_type.startswith('error'):
                         placeholder = f"""def test_{source_name}_{test_type}():
-    # Example unusual case test
-    assert {source_name}(1000) == 1000  # Replace with appropriate values
-    assert {source_name}(-1000) == -1000  # Replace with appropriate values"""
+    # Example error case test
+    with pytest.raises(Exception):
+        {source_name}(invalid_input)  # Replace with appropriate values"""
+                    else:  # basic
+                        placeholder = f"""def test_{source_name}_{test_type}():
+    # Example basic case test
+    assert {source_name}(typical_input_1) == expected_result_1
+    assert {source_name}(typical_input_2) == expected_result_2"""
                     
                     final_tests.append(placeholder)
                     print(f"WARNING: Missing test type '{test_type}' for function '{source_name}', added example placeholder")
@@ -432,12 +593,48 @@ REMEMBER: ONLY WRITE TEST FUNCTIONS WITH ACTUAL ASSERTIONS. NO PLACEHOLDERS OR T
 
 def main():
     """CLI entry point for processing multiple files and generating tests."""
-    generator = TestGenerator()
-    try:
-        generated_test_files = generator.process_files_list()
-        print(f"Generated test files: {generated_test_files}")
-    except Exception as e:
-        print(f"Error generating tests: {e}")
+    parser = argparse.ArgumentParser(description='Test Generator and Model Trainer')
+    parser.add_argument('--mode', choices=['generate', 'train'], default='generate',
+                      help='Mode to run in: generate tests or train model')
+    parser.add_argument('--source-dir', help='Directory containing source Python files')
+    parser.add_argument('--test-dir', help='Directory containing test Python files')
+    parser.add_argument('--output-model', help='Name for the fine-tuned model')
+    parser.add_argument('--model', default='starcoder:7b',
+                      help='Base model to use (default: starcoder:7b)')
+    
+    args = parser.parse_args()
+    
+    if args.mode == 'train':
+        if not all([args.source_dir, args.test_dir, args.output_model]):
+            print("Error: --source-dir, --test-dir, and --output-model are required for training mode")
+            return
+            
+        trainer = ModelTrainer(args.model)
+        
+        # Prepare training data
+        print("Preparing training data...")
+        examples = trainer.prepare_training_data(args.source_dir, args.test_dir)
+        
+        if not examples:
+            print("No training examples found!")
+            return
+            
+        # Save training data
+        training_data_file = 'training_data/training_examples.json'
+        trainer.save_training_data(examples, training_data_file)
+        print(f"Saved {len(examples)} training examples to {training_data_file}")
+        
+        # Fine-tune model
+        print("Starting model fine-tuning...")
+        trainer.fine_tune_model(training_data_file, args.output_model)
+        
+    else:  # generate mode
+        generator = TestGenerator(args.model)
+        try:
+            generated_test_files = generator.process_files_list()
+            print(f"Generated test files: {generated_test_files}")
+        except Exception as e:
+            print(f"Error generating tests: {e}")
 
 if __name__ == "__main__":
     main()
